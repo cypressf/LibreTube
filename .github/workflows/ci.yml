@@ -52,7 +52,8 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: app
-          path: app/build/outputs/apk/debug/app-debug-signed.apk
+          # forks don't have the signing keys: fall back to the debug-signed APK
+          path: app/build/outputs/apk/debug/*.apk
 
   release-nightly:
     if: github.ref_name == 'master'
