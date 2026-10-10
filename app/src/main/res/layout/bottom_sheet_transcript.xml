@@ -55,6 +55,17 @@
                     tools:text="English"
                     tools:visibility="visible" />
 
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/readButton"
+                    style="?attr/materialIconButtonFilledTonalStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:contentDescription="@string/reading_mode"
+                    android:tooltipText="@string/reading_mode"
+                    app:icon="@drawable/ic_article"
+                    tools:targetApi="o" />
+
             </LinearLayout>
 
             <com.google.android.material.divider.MaterialDivider

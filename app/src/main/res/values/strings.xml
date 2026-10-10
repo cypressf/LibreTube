@@ -578,4 +578,11 @@
     <string name="transcript">Transcript</string>
     <string name="transcript_unavailable">This video has no transcript.</string>
     <string name="transcript_load_failed">The transcript could not be loaded.</string>
+    <string name="reading_mode">Reading mode</string>
+    <string name="reading_mode_jump_to_current">Back to current</string>
+    <string name="reading_mode_no_punctuation">These captions have no punctuation, so the paragraph breaks are approximate.</string>
+    <plurals name="reading_time_minutes">
+        <item quantity="one">%d min read</item>
+        <item quantity="other">%d min read</item>
+    </plurals>
 </resources>

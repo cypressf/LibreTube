@@ -26,6 +26,7 @@ import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.view.marginStart
 import androidx.core.view.updateLayoutParams
+import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.findViewTreeLifecycleOwner
@@ -65,6 +66,7 @@ import com.github.libretube.helpers.WindowHelper
 import com.github.libretube.obj.BottomSheetItem
 import com.github.libretube.obj.VideoResolution
 import com.github.libretube.services.AbstractPlayerService
+import com.github.libretube.ui.activities.AbstractPlayerHostActivity
 import com.github.libretube.ui.base.BaseActivity
 import com.github.libretube.ui.controllers.FullscreenGestureAnimationController
 import com.github.libretube.ui.dialogs.SubmitDeArrowDialog
@@ -302,6 +304,13 @@ class CustomExoPlayerView(
             findViewTreeLifecycleOwner() ?: activity
         ) { _, bundle ->
             player.seekTo(bundle.getLong(IntentData.currentPosition))
+        }
+
+        activity.supportFragmentManager.setFragmentResultListener(
+            TranscriptBottomSheet.OPEN_READING_MODE_REQUEST_KEY,
+            findViewTreeLifecycleOwner() ?: activity
+        ) { _, _ ->
+            openReadingMode()
         }
 
         // enable the chapters dialog in the player
@@ -619,7 +628,15 @@ class CustomExoPlayerView(
         }
     }
 
-    fun getOptionsMenuItems(): List<BottomSheetItem> = listOfNotNull(
+    fun getOptionsMenuItems(): List<BottomSheetItem> {
+        // live streams don't provide a complete subtitle file
+        val streamsWithTranscript = getCurrentStreams()
+            ?.takeIf { streams -> !streams.isLive && streams.subtitles.any { it.url != null } }
+
+        return getOptionsMenuItems(streamsWithTranscript)
+    }
+
+    private fun getOptionsMenuItems(streamsWithTranscript: Streams?): List<BottomSheetItem> = listOfNotNull(
         BottomSheetItem(
             context.getString(R.string.repeat_mode),
             R.drawable.ic_repeat,
@@ -697,7 +714,8 @@ class CustomExoPlayerView(
         ) {
             onCaptionsClicked()
         },
-        getTranscriptMenuItem(),
+        streamsWithTranscript?.let { getTranscriptMenuItem(it) },
+        streamsWithTranscript?.let { getReadingModeMenuItem() },
         BottomSheetItem(
             context.getString(R.string.stats_for_nerds),
             R.drawable.ic_info
@@ -1030,16 +1048,36 @@ class CustomExoPlayerView(
     private fun getCurrentMetadataVideoId(): String? =
         player?.mediaMetadata?.extras?.getString(IntentData.videoId)
 
-    private fun getTranscriptMenuItem(): BottomSheetItem? {
-        // live streams don't provide a complete subtitle file
-        val streams = getCurrentStreams()?.takeIf { !it.isLive } ?: return null
-        if (streams.subtitles.none { it.url != null }) return null
-
+    private fun getTranscriptMenuItem(streams: Streams): BottomSheetItem {
         return BottomSheetItem(
             context.getString(R.string.transcript),
             R.drawable.ic_text
         ) {
             onTranscriptClicked(streams)
+        }
+    }
+
+    private fun getReadingModeMenuItem(): BottomSheetItem {
+        return BottomSheetItem(
+            context.getString(R.string.reading_mode),
+            R.drawable.ic_article
+        ) {
+            openReadingMode()
+        }
+    }
+
+    /**
+     * Continue playback in the audio player, showing the transcript as an article.
+     */
+    private fun openReadingMode() {
+        // the transcript sheet would be left behind without a player to control
+        (supportFragmentManager.findFragmentByTag(TranscriptBottomSheet.TAG) as? DialogFragment)
+            ?.dismiss()
+
+        PreferenceHelper.putBoolean(PreferenceKeys.AUDIO_PLAYER_READING_MODE, true)
+        (activity as? AbstractPlayerHostActivity)?.runOnPlayerFragment {
+            switchToAudioMode()
+            true
         }
     }
 

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/paragraphText"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:breakStrategy="high_quality"
+    android:fontFamily="serif"
+    android:hyphenationFrequency="normal"
+    android:lineSpacingMultiplier="1.4"
+    android:paddingHorizontal="24dp"
+    android:paddingBottom="18dp"
+    android:textColor="?android:textColorPrimary"
+    android:textSize="18sp"
+    tools:ignore="UnusedAttribute"
+    tools:text="Rivers don't flow in straight lines. Even on a perfectly flat plain, a tiny bend grows over time, because the water on the outside of the curve moves faster and erodes the bank." />

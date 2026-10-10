@@ -44,6 +44,19 @@
                 android:layout_height="0dp"
                 android:layout_weight="1" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/readingMode"
+                style="?attr/materialIconButtonFilledTonalStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_marginEnd="12dp"
+                android:checkable="true"
+                android:contentDescription="@string/reading_mode"
+                android:tooltipText="@string/reading_mode"
+                app:icon="@drawable/ic_article"
+                tools:targetApi="o" />
+
             <com.google.android.material.materialswitch.MaterialSwitch
                 style="@style/Widget.Material3.CompoundButton.MaterialSwitch"
                 android:id="@+id/autoPlay"
@@ -59,62 +72,76 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <com.google.android.material.imageview.ShapeableImageView
-                android:id="@+id/thumbnail"
+            <FrameLayout
+                android:id="@+id/thumbnailContainer"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_marginHorizontal="20dp"
-                android:layout_marginVertical="10dp"
-                android:adjustViewBounds="true"
-                android:scaleType="fitCenter"
-                app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Small"
-                tools:src="@tools:sample/backgrounds/scenic" />
+                android:layout_height="match_parent">
 
-            <LinearLayout
-                android:id="@+id/volumeControls"
-                android:layout_width="42dp"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:background="@drawable/controls_layout_bg"
-                android:orientation="vertical"
-                android:visibility="gone"
-                tools:ignore="RtlHardcoded">
-
-                <TextView
-                    android:id="@+id/volume_textView"
-                    style="@style/SwipeControlString"
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/thumbnail"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    app:autoSizeTextType="uniform" />
+                    android:layout_marginHorizontal="20dp"
+                    android:layout_marginVertical="10dp"
+                    android:adjustViewBounds="true"
+                    android:scaleType="fitCenter"
+                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Small"
+                    tools:src="@tools:sample/backgrounds/scenic" />
 
-                <ProgressBar
-                    android:id="@+id/volume_progressBar"
-                    style="@android:style/Widget.ProgressBar.Horizontal"
-                    android:layout_width="7dp"
-                    android:layout_height="100dp"
+                <LinearLayout
+                    android:id="@+id/volumeControls"
+                    android:layout_width="42dp"
+                    android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:layout_marginVertical="4dp"
-                    android:progressDrawable="@drawable/vertical_progressbar" />
+                    android:background="@drawable/controls_layout_bg"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    tools:ignore="RtlHardcoded">
 
-                <ImageView
-                    android:id="@+id/volume_imageView"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_gravity="center"
-                    android:contentDescription="@string/volume"
-                    android:src="@drawable/ic_volume_up" />
+                    <TextView
+                        android:id="@+id/volume_textView"
+                        style="@style/SwipeControlString"
+                        android:layout_gravity="center"
+                        app:autoSizeTextType="uniform" />
 
-            </LinearLayout>
+                    <ProgressBar
+                        android:id="@+id/volume_progressBar"
+                        style="@android:style/Widget.ProgressBar.Horizontal"
+                        android:layout_width="7dp"
+                        android:layout_height="100dp"
+                        android:layout_gravity="center"
+                        android:layout_marginVertical="4dp"
+                        android:progressDrawable="@drawable/vertical_progressbar" />
 
-            <com.google.android.material.loadingindicator.LoadingIndicator
-                android:id="@+id/progress"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center" />
+                    <ImageView
+                        android:id="@+id/volume_imageView"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@string/volume"
+                        android:src="@drawable/ic_volume_up" />
+
+                </LinearLayout>
+
+                <com.google.android.material.loadingindicator.LoadingIndicator
+                    android:id="@+id/progress"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center" />
+
+            </FrameLayout>
+
+            <com.github.libretube.ui.views.ArticleReaderView
+                android:id="@+id/articleReader"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
 
         </FrameLayout>
 
         <LinearLayout
+            android:id="@+id/titleLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_margin="20dp"
