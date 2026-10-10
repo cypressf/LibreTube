@@ -1,0 +1,101 @@
+package com.github.libretube.helpers
+
+import androidx.annotation.OptIn
+import androidx.media3.common.C
+import androidx.media3.common.Format
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.extractor.text.DefaultSubtitleParserFactory
+import androidx.media3.extractor.text.SubtitleParser
+import com.github.libretube.api.obj.Subtitle
+import com.github.libretube.obj.TranscriptLine
+import com.github.libretube.util.TranscriptMerger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runInterruptible
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.IOException
+
+@OptIn(UnstableApi::class)
+object TranscriptHelper {
+    // a plain client, since the debug logging of the API clients would dump whole subtitle files
+    private val httpClient by lazy { OkHttpClient() }
+
+    /**
+     * Download the given subtitle track and turn it into a list of transcript lines.
+     *
+     * @throws IOException if the subtitle couldn't be downloaded
+     * @throws IllegalArgumentException if the subtitle format isn't supported
+     */
+    suspend fun loadTranscript(subtitle: Subtitle): List<TranscriptLine> =
+        // interruptible, so that the download stops when e.g. the user switches the language
+        runInterruptible(Dispatchers.IO) {
+            val url = subtitle.url ?: throw IllegalArgumentException("Subtitle has no url")
+            val request = Request.Builder().url(url).build()
+            val data = httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
+                response.body.bytes()
+            }
+
+            parseTranscript(data, subtitle.mimeType)
+        }
+
+    fun parseTranscript(data: ByteArray, declaredMimeType: String?): List<TranscriptLine> {
+        val parserFactory = DefaultSubtitleParserFactory()
+
+        val mimeType = listOfNotNull(sniffMimeType(data), normalizeMimeType(declaredMimeType))
+            .firstOrNull { parserFactory.supportsFormat(formatOf(it)) }
+            ?: throw IllegalArgumentException("Unsupported subtitle format: $declaredMimeType")
+
+        val slices = mutableListOf<TranscriptMerger.CueSlice>()
+        parserFactory.create(formatOf(mimeType))
+            .parse(data, SubtitleParser.OutputOptions.allCues()) { cuesWithTiming ->
+                val texts = cuesWithTiming.cues.mapNotNull { it.text?.toString() }
+                if (texts.isEmpty()) return@parse
+
+                val endMs = cuesWithTiming.endTimeUs
+                    .takeIf { it != C.TIME_UNSET }
+                    ?.div(1000)
+                slices.add(
+                    TranscriptMerger.CueSlice(cuesWithTiming.startTimeUs / 1000, endMs, texts)
+                )
+            }
+
+        return TranscriptMerger.merge(slices)
+    }
+
+    private fun formatOf(mimeType: String) = Format.Builder()
+        .setSampleMimeType(mimeType)
+        .build()
+
+    /**
+     * Map MIME types used by YouTube or NewPipeExtractor to the ones known by Media3.
+     */
+    private fun normalizeMimeType(mimeType: String?): String? {
+        val normalized = mimeType?.substringBefore(';')?.trim()?.lowercase()
+        return when (normalized) {
+            null, "" -> null
+            "text/srt", "application/srt", "application/x-srt" -> MimeTypes.APPLICATION_SUBRIP
+            "text/ttml", "application/ttml" -> MimeTypes.APPLICATION_TTML
+            "text/webvtt" -> MimeTypes.TEXT_VTT
+            else -> normalized
+        }
+    }
+
+    /**
+     * Detect the subtitle format from the file contents, since the declared MIME type isn't
+     * always accurate.
+     */
+    private fun sniffMimeType(data: ByteArray): String? {
+        val head = String(data, 0, minOf(data.size, 512), Charsets.UTF_8)
+            .removePrefix("\uFEFF")
+            .trimStart()
+
+        return when {
+            head.startsWith("WEBVTT") -> MimeTypes.TEXT_VTT
+            head.contains("<tt") -> MimeTypes.APPLICATION_TTML
+            head.contains("-->") -> MimeTypes.APPLICATION_SUBRIP
+            else -> null
+        }
+    }
+}
