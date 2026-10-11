@@ -54,7 +54,14 @@ object NavigationHelper {
         alreadyStarted: Boolean = false,
         forceVideo: Boolean = false,
         audioOnlyPlayerRequested: Boolean = false,
+        readerViewRequested: Boolean = false,
     ) {
+        // reader view plays the audio while showing the transcript, so it's a form of audio mode;
+        // downloaded videos don't have a transcript to read
+        val readerViewDefault =
+            PreferenceHelper.getBoolean(PreferenceKeys.READER_VIEW_DEFAULT, false) && !forceVideo
+        val readerView = (readerViewRequested || readerViewDefault) && !playerData.isOffline
+
         // attempt to attach to the current media session first by using the corresponding
         // video/audio player instance
         val activity = ContextHelper.unwrapActivity<AbstractPlayerHostActivity>(context)
@@ -67,7 +74,9 @@ object NavigationHelper {
                 PlayingQueue.clearAfterCurrent()
                 this.playVideo(playerData.videoId.toID())
 
-                if (audioOnlyPlayerRequested) {
+                if (readerView) {
+                    this.switchToReaderView()
+                } else if (audioOnlyPlayerRequested) {
                     // switch to audio only player
                     this.switchToAudioMode()
                 } else {
@@ -92,10 +101,11 @@ object NavigationHelper {
             PlayingQueue.clearAfterCurrent()
             this.playNextVideo(playerData.videoId.toID())
 
-            if (!audioOnlyPlayerRequested && !audioOnlyMode) {
+            if (!audioOnlyPlayerRequested && !audioOnlyMode && !readerView) {
                 // switch to video only player
                 this.switchToVideoMode(playerData.videoId.toID())
             } else {
+                if (readerView) this.showReaderView()
                 // maximize player
                 this.binding.playerMotionLayout.transitionToStart()
             }
@@ -104,12 +114,18 @@ object NavigationHelper {
         }
         if (attachedToRunningAudioPlayer) return
 
-        if (audioOnlyPlayerRequested || (audioOnlyMode && !forceVideo)) {
+        if (audioOnlyPlayerRequested || readerView || (audioOnlyMode && !forceVideo)) {
             // in contrast to the video player, the audio player doesn't start a media service on
             // its own!
             BackgroundHelper.playOnBackground(context, playerData)
 
-            openAudioPlayerFragment(context, offlinePlayer = playerData.isOffline, minimizeByDefault = true)
+            openAudioPlayerFragment(
+                context,
+                offlinePlayer = playerData.isOffline,
+                // reader view is for reading, so show it right away
+                minimizeByDefault = !readerView,
+                readerView = readerView
+            )
         } else {
             openVideoPlayerFragment(
                 context,
@@ -134,13 +150,15 @@ object NavigationHelper {
     fun openAudioPlayerFragment(
         context: Context,
         offlinePlayer: Boolean = false,
-        minimizeByDefault: Boolean = false
+        minimizeByDefault: Boolean = false,
+        readerView: Boolean = false
     ) {
         val activity = ContextHelper.unwrapActivity<BaseActivity>(context)
         activity.supportFragmentManager.commitNow {
             val args = bundleOf(
                 IntentData.minimizeByDefault to minimizeByDefault,
-                IntentData.offlinePlayer to offlinePlayer
+                IntentData.offlinePlayer to offlinePlayer,
+                IntentData.readerView to readerView
             )
             replace<AudioPlayerFragment>(R.id.container, args = args)
         }

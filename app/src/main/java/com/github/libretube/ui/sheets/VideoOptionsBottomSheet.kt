@@ -57,6 +57,17 @@ class VideoOptionsBottomSheet : BaseBottomSheet() {
                     audioOnlyPlayerRequested = true
                 )
             }
+            // Show the transcript as an article while the audio plays
+            R.string.read -> {
+                NavigationHelper.navigateVideo(
+                    requireContext(),
+                    playerData = PlayerData(
+                        videoId = videoId,
+                        playlistId = playlistId,
+                    ),
+                    readerViewRequested = true
+                )
+            }
             // Add Video to Playlist Dialog
             R.string.addToPlaylist -> {
                 AddToPlaylistDialog().apply {
@@ -177,6 +188,8 @@ class VideoOptionsBottomSheet : BaseBottomSheet() {
     ) {
         // List that stores the different menu options. In the future could be add more options here.
         val optionsList = mutableListOf(R.string.playOnBackground)
+        // live streams don't have a complete transcript
+        if (!streamItem.isLive) optionsList += R.string.read
 
         // Check whether the player is running and add queue options
         if (PlayingQueue.isNotEmpty() && PlayingQueue.queueMode == PlayingQueueMode.ONLINE) {

@@ -22,13 +22,6 @@ class TranscriptViewModel : ViewModel() {
 
     val state = MutableLiveData<State>()
 
-    /**
-     * The current playback position, only updated while the transcript sheet is open.
-     */
-    val positionMs = MutableLiveData<Long>()
-
-    var isSheetOpen = false
-
     var videoId: String? = null
         private set
     var subtitles: List<Subtitle> = emptyList()
@@ -43,7 +36,7 @@ class TranscriptViewModel : ViewModel() {
      * if the video didn't change.
      *
      * @param preferredLanguage the user's default subtitle language, only used if no language
-     * has been picked in the transcript sheet before
+     * has been picked in reader view before
      */
     fun setVideo(videoId: String, subtitles: List<Subtitle>, preferredLanguage: String?) {
         if (videoId == this.videoId && state.value != null) return

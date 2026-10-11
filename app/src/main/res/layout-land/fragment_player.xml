@@ -68,6 +68,13 @@
                         app:icon="@drawable/ic_headphones" />
 
                     <com.google.android.material.button.MaterialButton
+                        android:id="@+id/relPlayer_read"
+                        style="@style/PlayerActionsButton"
+                        android:text="@string/read"
+                        android:visibility="gone"
+                        app:icon="@drawable/ic_article" />
+
+                    <com.google.android.material.button.MaterialButton
                         android:id="@+id/relPlayer_external_player"
                         style="@style/PlayerActionsButton"
                         android:text="@string/external_player"

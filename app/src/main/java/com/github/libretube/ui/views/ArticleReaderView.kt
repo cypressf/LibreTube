@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.SimpleItemAnimator
 import com.github.libretube.R
 import com.github.libretube.databinding.ViewArticleReaderBinding
 import com.github.libretube.ui.adapters.ArticleAdapter
+import com.github.libretube.ui.models.ReaderStyle
 import com.github.libretube.util.ArticleFormatter
 
 /**
@@ -31,6 +32,8 @@ class ArticleReaderView @JvmOverloads constructor(
     var onSeek: (positionMs: Long) -> Unit = {}
     var onLanguageClick: () -> Unit = {}
     var onRetry: () -> Unit = {}
+    var onMinimize: () -> Unit = {}
+    var onShowPlayer: () -> Unit = {}
 
     private val layoutManager = LinearLayoutManager(context)
     private val adapter = ArticleAdapter(
@@ -40,7 +43,9 @@ class ArticleReaderView @JvmOverloads constructor(
             onSeek(positionMs)
         },
         onLanguageClick = { onLanguageClick() },
-        onRetry = { onRetry() }
+        onRetry = { onRetry() },
+        onMinimize = { onMinimize() },
+        onShowPlayer = { onShowPlayer() }
     )
 
     private var article: ArticleFormatter.Article? = null
@@ -75,6 +80,11 @@ class ArticleReaderView @JvmOverloads constructor(
             scrollToCurrent(smooth = false)
         }
     }
+
+    /**
+     * Apply the font and text size from the settings.
+     */
+    fun setStyle(style: ReaderStyle) = adapter.setStyle(style)
 
     fun showLoading(header: ArticleAdapter.Header) {
         showStatus(header.copy(status = ArticleAdapter.Status.Loading))

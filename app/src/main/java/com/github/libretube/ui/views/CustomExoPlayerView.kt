@@ -26,9 +26,7 @@ import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.view.marginStart
 import androidx.core.view.updateLayoutParams
-import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.media3.common.C
 import androidx.media3.common.PlaybackParameters
@@ -62,6 +60,7 @@ import com.github.libretube.helpers.AudioHelper
 import com.github.libretube.helpers.BrightnessHelper
 import com.github.libretube.helpers.PlayerHelper
 import com.github.libretube.helpers.PreferenceHelper
+import com.github.libretube.helpers.TranscriptHelper
 import com.github.libretube.helpers.WindowHelper
 import com.github.libretube.obj.BottomSheetItem
 import com.github.libretube.obj.VideoResolution
@@ -79,14 +78,12 @@ import com.github.libretube.ui.listeners.PlayerGestureController
 import com.github.libretube.ui.models.ChaptersViewModel
 import com.github.libretube.ui.models.CommonPlayerViewModel
 import com.github.libretube.ui.models.PlayerViewModel
-import com.github.libretube.ui.models.TranscriptViewModel
 import com.github.libretube.ui.sheets.BaseBottomSheet
 import com.github.libretube.ui.sheets.ChaptersBottomSheet
 import com.github.libretube.ui.sheets.PlaybackOptionsSheet
 import com.github.libretube.ui.sheets.PlayingQueueSheet
 import com.github.libretube.ui.sheets.SleepTimerSheet
 import com.github.libretube.ui.sheets.StatsSheet
-import com.github.libretube.ui.sheets.TranscriptBottomSheet
 import com.github.libretube.ui.tools.SleepTimer
 import com.github.libretube.util.PlayingQueue
 import java.util.Locale
@@ -145,33 +142,6 @@ class CustomExoPlayerView(
 
     private val supportFragmentManager
         get() = activity.supportFragmentManager
-
-    private val transcriptViewModel: TranscriptViewModel
-        get() = ViewModelProvider(activity)[TranscriptViewModel::class.java]
-
-    /**
-     * Publishes the playback position to the transcript sheet while it's open.
-     */
-    private val transcriptPositionUpdater = object : Runnable {
-        override fun run() {
-            val viewModel = transcriptViewModel
-            val player = player ?: return
-            if (!viewModel.isSheetOpen || !isAttachedToWindow) return
-
-            // load the transcript of the next video if playback moved on while the sheet is open
-            val videoId = getCurrentMetadataVideoId()
-            if (videoId != null && videoId != viewModel.videoId) {
-                getCurrentStreams()?.let { streams ->
-                    // live streams don't provide a complete subtitle file
-                    val subtitles = if (streams.isLive) emptyList() else streams.subtitles
-                    viewModel.setVideo(videoId, subtitles, PlayerHelper.defaultSubtitleCode)
-                }
-            }
-
-            viewModel.positionMs.updateIfChanged(player.currentPosition)
-            runnableHandler.postDelayed(this, TRANSCRIPT_POSITION_UPDATE_INTERVAL_MS)
-        }
-    }
 
     /**
      * Playback speed that has been set before the fast forward mode
@@ -304,13 +274,6 @@ class CustomExoPlayerView(
             findViewTreeLifecycleOwner() ?: activity
         ) { _, bundle ->
             player.seekTo(bundle.getLong(IntentData.currentPosition))
-        }
-
-        activity.supportFragmentManager.setFragmentResultListener(
-            TranscriptBottomSheet.OPEN_READING_MODE_REQUEST_KEY,
-            findViewTreeLifecycleOwner() ?: activity
-        ) { _, _ ->
-            openReadingMode()
         }
 
         // enable the chapters dialog in the player
@@ -629,14 +592,11 @@ class CustomExoPlayerView(
     }
 
     fun getOptionsMenuItems(): List<BottomSheetItem> {
-        // live streams don't provide a complete subtitle file
-        val streamsWithTranscript = getCurrentStreams()
-            ?.takeIf { streams -> !streams.isLive && streams.subtitles.any { it.url != null } }
-
-        return getOptionsMenuItems(streamsWithTranscript)
+        val hasTranscript = getCurrentStreams()?.let(TranscriptHelper::hasTranscript) == true
+        return getOptionsMenuItems(hasTranscript)
     }
 
-    private fun getOptionsMenuItems(streamsWithTranscript: Streams?): List<BottomSheetItem> = listOfNotNull(
+    private fun getOptionsMenuItems(hasTranscript: Boolean): List<BottomSheetItem> = listOfNotNull(
         BottomSheetItem(
             context.getString(R.string.repeat_mode),
             R.drawable.ic_repeat,
@@ -714,8 +674,7 @@ class CustomExoPlayerView(
         ) {
             onCaptionsClicked()
         },
-        streamsWithTranscript?.let { getTranscriptMenuItem(it) },
-        streamsWithTranscript?.let { getReadingModeMenuItem() },
+        getReaderMenuItem().takeIf { hasTranscript },
         BottomSheetItem(
             context.getString(R.string.stats_for_nerds),
             R.drawable.ic_info
@@ -1042,63 +1001,14 @@ class CustomExoPlayerView(
         ?.getString(IntentData.streams)
         ?.let { runCatching { JsonHelper.json.decodeFromString<Streams>(it) }.getOrNull() }
 
-    /**
-     * The id of the video that [getCurrentStreams] belongs to.
-     */
-    private fun getCurrentMetadataVideoId(): String? =
-        player?.mediaMetadata?.extras?.getString(IntentData.videoId)
-
-    private fun getTranscriptMenuItem(streams: Streams): BottomSheetItem {
-        return BottomSheetItem(
-            context.getString(R.string.transcript),
-            R.drawable.ic_text
-        ) {
-            onTranscriptClicked(streams)
-        }
-    }
-
-    private fun getReadingModeMenuItem(): BottomSheetItem {
-        return BottomSheetItem(
-            context.getString(R.string.reading_mode),
-            R.drawable.ic_article
-        ) {
-            openReadingMode()
-        }
-    }
-
-    /**
-     * Continue playback in the audio player, showing the transcript as an article.
-     */
-    private fun openReadingMode() {
-        // the transcript sheet would be left behind without a player to control
-        (supportFragmentManager.findFragmentByTag(TranscriptBottomSheet.TAG) as? DialogFragment)
-            ?.dismiss()
-
-        PreferenceHelper.putBoolean(PreferenceKeys.AUDIO_PLAYER_READING_MODE, true)
+    private fun getReaderMenuItem() = BottomSheetItem(
+        context.getString(R.string.reader_view),
+        R.drawable.ic_article
+    ) {
         (activity as? AbstractPlayerHostActivity)?.runOnPlayerFragment {
-            switchToAudioMode()
+            switchToReaderView()
             true
         }
-    }
-
-    private fun onTranscriptClicked(streams: Streams) {
-        // the sheet doesn't block the player controls, so it might already be open
-        if (supportFragmentManager.findFragmentByTag(TranscriptBottomSheet.TAG) != null) return
-
-        val videoId = getCurrentMetadataVideoId() ?: playerCallback.getVideoId()
-
-        transcriptViewModel.setVideo(
-            videoId,
-            streams.subtitles,
-            PlayerHelper.defaultSubtitleCode
-        )
-        transcriptViewModel.isSheetOpen = true
-
-        player?.let { transcriptViewModel.positionMs.value = it.currentPosition }
-        runnableHandler.removeCallbacks(transcriptPositionUpdater)
-        runnableHandler.post(transcriptPositionUpdater)
-
-        TranscriptBottomSheet().show(supportFragmentManager, TranscriptBottomSheet.TAG)
     }
 
     fun updateCurrentSubtitle(trackId: String?) {
@@ -1593,7 +1503,6 @@ class CustomExoPlayerView(
         private const val SUBTITLE_BOTTOM_PADDING_FRACTION = 0.158f
         private const val ANIMATION_DURATION = 100L
         private const val AUTO_HIDE_CONTROLLER_DELAY = 2000L
-        private const val TRANSCRIPT_POSITION_UPDATE_INTERVAL_MS = 250L
         private val LANDSCAPE_MARGIN_HORIZONTAL = 20f.dpToPx()
         private val LANDSCAPE_MARGIN_HORIZONTAL_NONE = 0f.dpToPx()
     }

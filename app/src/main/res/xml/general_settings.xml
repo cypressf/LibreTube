@@ -22,6 +22,13 @@
             android:title="@string/audio_only_mode"
             app:key="audio_only_mode" />
 
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:icon="@drawable/ic_article"
+            android:summary="@string/reader_view_default_summary"
+            android:title="@string/reader_view_default"
+            app:key="reader_view_default" />
+
         <ListPreference
             android:defaultValue="@string/config_default_orientation_pref"
             android:entries="@array/orientation"
@@ -43,6 +50,28 @@
             app:key="related_streams_toggle"
             app:summary="@string/related_streams_summary"
             app:title="@string/related_streams" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/reader_view">
+
+        <ListPreference
+            android:defaultValue="serif"
+            android:entries="@array/reader_fonts"
+            android:entryValues="@array/reader_fonts_values"
+            android:icon="@drawable/ic_text"
+            app:key="reader_font"
+            app:title="@string/reader_font"
+            app:useSimpleSummaryProvider="true" />
+
+        <ListPreference
+            android:defaultValue="18"
+            android:entries="@array/reader_text_sizes"
+            android:entryValues="@array/reader_text_sizes_values"
+            android:icon="@drawable/ic_text"
+            app:key="reader_text_size"
+            app:title="@string/reader_text_size"
+            app:useSimpleSummaryProvider="true" />
 
     </PreferenceCategory>
 

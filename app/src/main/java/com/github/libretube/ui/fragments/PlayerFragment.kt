@@ -79,6 +79,7 @@ import com.github.libretube.helpers.ImageHelper
 import com.github.libretube.helpers.NavigationHelper
 import com.github.libretube.helpers.PlayerHelper
 import com.github.libretube.helpers.PlayerHelper.getCurrentSegment
+import com.github.libretube.helpers.TranscriptHelper
 import com.github.libretube.helpers.ThemeHelper
 import com.github.libretube.helpers.WindowHelper
 import com.github.libretube.obj.ShareData
@@ -104,6 +105,7 @@ import com.github.libretube.ui.models.ChaptersViewModel
 import com.github.libretube.ui.models.CommentsViewModel
 import com.github.libretube.ui.models.CommonPlayerViewModel
 import com.github.libretube.ui.models.PlayerViewModel
+import com.github.libretube.ui.models.TranscriptViewModel
 import com.github.libretube.ui.sheets.CommentsSheet
 import com.github.libretube.util.OfflineTimeFrameReceiver
 import com.github.libretube.util.OnlineTimeFrameReceiver
@@ -132,6 +134,7 @@ class PlayerFragment : Fragment(R.layout.fragment_player), CustomPlayerCallback 
     private val viewModel: PlayerViewModel by viewModels()
     private val commentsViewModel: CommentsViewModel by activityViewModels()
     private val chaptersViewModel: ChaptersViewModel by activityViewModels()
+    private val transcriptViewModel: TranscriptViewModel by activityViewModels()
     private lateinit var playerController: MediaController
 
     // Video information passed by the intent
@@ -715,6 +718,10 @@ class PlayerFragment : Fragment(R.layout.fragment_player), CustomPlayerCallback 
             switchToAudioMode()
         }
 
+        binding.relPlayerRead.setOnClickListener {
+            switchToReaderView()
+        }
+
         binding.relPlayerPip.isVisible = isPipAvailable()
 
         binding.relPlayerPip.setOnClickListener {
@@ -789,7 +796,22 @@ class PlayerFragment : Fragment(R.layout.fragment_player), CustomPlayerCallback 
         chaptersViewModel.maxSheetHeightPx = maxHeight
     }
 
-    fun switchToAudioMode() {
+    /**
+     * Continue playback in the audio player, showing the transcript as an article.
+     */
+    fun switchToReaderView() {
+        // start loading the transcript right away, so that it's ready sooner
+        if (this::streams.isInitialized && TranscriptHelper.hasTranscript(streams)) {
+            transcriptViewModel.setVideo(
+                videoId,
+                streams.subtitles,
+                PlayerHelper.defaultSubtitleCode
+            )
+        }
+        switchToAudioMode(readerView = true)
+    }
+
+    fun switchToAudioMode(readerView: Boolean = false) {
         playerController.sendCustomCommand(
             AbstractPlayerService.runPlayerActionCommand,
             bundleOf(PlayerCommand.TOGGLE_AUDIO_ONLY_MODE.name to true)
@@ -808,7 +830,11 @@ class PlayerFragment : Fragment(R.layout.fragment_player), CustomPlayerCallback 
         playerController.release()
         killPlayerFragment()
 
-        NavigationHelper.openAudioPlayerFragment(requireContext(), offlinePlayer = isOffline)
+        NavigationHelper.openAudioPlayerFragment(
+            requireContext(),
+            offlinePlayer = isOffline,
+            readerView = readerView && !isOffline
+        )
     }
 
     private fun updateFullscreenOrientation() {
@@ -1169,6 +1195,7 @@ class PlayerFragment : Fragment(R.layout.fragment_player), CustomPlayerCallback 
             playerChannelSubCount.isVisible = streams.uploaderSubscriberCount >= 0
 
             relPlayerDownload.isVisible = !streams.isLive && !isOffline
+            relPlayerRead.isVisible = !isOffline && TranscriptHelper.hasTranscript(streams)
         }
         playerControlsBinding.exoTitle.text = streams.title
 

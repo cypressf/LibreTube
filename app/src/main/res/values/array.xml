@@ -287,4 +287,32 @@
         <item>@string/category_music_offtopic</item>
         <item>@string/category_preview</item>
     </string-array>
+    <string-array name="reader_fonts">
+        <item>@string/reader_font_serif</item>
+        <item>@string/reader_font_sans</item>
+        <item>@string/reader_font_hyperlegible</item>
+        <item>@string/reader_font_mono</item>
+    </string-array>
+
+    <string-array name="reader_fonts_values" translatable="false">
+        <item>serif</item>
+        <item>sans</item>
+        <item>hyperlegible</item>
+        <item>mono</item>
+    </string-array>
+
+    <string-array name="reader_text_sizes">
+        <item>@string/reader_text_size_small</item>
+        <item>@string/reader_text_size_medium</item>
+        <item>@string/reader_text_size_large</item>
+        <item>@string/reader_text_size_extra_large</item>
+    </string-array>
+
+    <string-array name="reader_text_sizes_values" translatable="false">
+        <item>16</item>
+        <item>18</item>
+        <item>21</item>
+        <item>24</item>
+    </string-array>
+
 </resources>

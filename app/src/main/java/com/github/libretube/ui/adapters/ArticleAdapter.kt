@@ -1,12 +1,15 @@
 package com.github.libretube.ui.adapters
 
 import android.annotation.SuppressLint
+import android.graphics.Typeface
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.BackgroundColorSpan
+import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
@@ -16,6 +19,7 @@ import com.github.libretube.databinding.ArticleHeadingRowBinding
 import com.github.libretube.databinding.ArticleParagraphRowBinding
 import com.github.libretube.helpers.ClipboardHelper
 import com.github.libretube.helpers.ThemeHelper
+import com.github.libretube.ui.models.ReaderStyle
 import com.github.libretube.util.ArticleFormatter
 
 /**
@@ -26,7 +30,9 @@ import com.github.libretube.util.ArticleFormatter
 class ArticleAdapter(
     private val onSeek: (positionMs: Long) -> Unit,
     private val onLanguageClick: () -> Unit,
-    private val onRetry: () -> Unit
+    private val onRetry: () -> Unit,
+    private val onMinimize: () -> Unit,
+    private val onShowPlayer: () -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     data class Header(
         val title: String,
@@ -53,6 +59,15 @@ class ArticleAdapter(
         private set
     var currentLocation: ArticleFormatter.Location? = null
         private set
+    var style: ReaderStyle? = null
+        private set
+
+    @SuppressLint("NotifyDataSetChanged")
+    fun setStyle(style: ReaderStyle) {
+        if (this.style == style) return
+        this.style = style
+        notifyDataSetChanged()
+    }
 
     @SuppressLint("NotifyDataSetChanged")
     fun submit(header: Header, blocks: List<ArticleFormatter.Block>) {
@@ -121,6 +136,15 @@ class ArticleAdapter(
     private fun bindHeader(holder: HeaderViewHolder) {
         val header = header ?: return
         holder.binding.apply {
+            articleMinimize.setOnClickListener { onMinimize() }
+            articleShowPlayer.setOnClickListener { onShowPlayer() }
+
+            style?.let { style ->
+                articleTitle.applyStyle(style.typeface, style.titleSizeSp, bold = true)
+                articleAuthor.applyStyle(style.typeface, style.metaSizeSp * 1.12f)
+                articleMeta.applyStyle(style.typeface, style.metaSizeSp)
+            }
+
             articleTitle.text = header.title
             articleAuthor.text = header.author
             articleAuthor.isVisible = header.author.isNotBlank()
@@ -141,6 +165,7 @@ class ArticleAdapter(
     }
 
     private fun bindHeading(holder: HeadingViewHolder, heading: ArticleFormatter.Heading) {
+        style?.let { holder.binding.headingText.applyStyle(it.typeface, it.headingSizeSp, bold = true) }
         holder.binding.headingText.text = heading.title
         ViewCompat.setAccessibilityHeading(holder.binding.root, true)
         holder.binding.root.setOnClickListener { onSeek(heading.startMs) }
@@ -149,6 +174,7 @@ class ArticleAdapter(
     @SuppressLint("ClickableViewAccessibility")
     private fun bindParagraph(holder: ParagraphViewHolder, blockIndex: Int) {
         val textView = holder.binding.paragraphText
+        style?.let { textView.applyStyle(it.typeface, it.textSizeSp) }
 
         updateHighlight(holder, blockIndex)
         holder.lastTouchX = -1f
@@ -248,6 +274,11 @@ class ArticleAdapter(
         RecyclerView.ViewHolder(binding.root) {
         var lastTouchX = -1f
         var lastTouchY = -1f
+    }
+
+    private fun TextView.applyStyle(typeface: Typeface, sizeSp: Float, bold: Boolean = false) {
+        setTypeface(typeface, if (bold) Typeface.BOLD else Typeface.NORMAL)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
     }
 
     companion object {

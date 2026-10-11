@@ -56,25 +56,4 @@ object TranscriptMerger {
 
         return transcript
     }
-
-    /**
-     * Find the index of the line that is being spoken at [positionMs], or -1 if the position
-     * is before the first line.
-     */
-    fun indexAt(lines: List<TranscriptLine>, positionMs: Long): Int {
-        // binary search for the last line whose start is <= positionMs
-        var low = 0
-        var high = lines.size - 1
-        var result = -1
-        while (low <= high) {
-            val mid = (low + high) ushr 1
-            if (lines[mid].startMs <= positionMs) {
-                result = mid
-                low = mid + 1
-            } else {
-                high = mid - 1
-            }
-        }
-        return result
-    }
 }

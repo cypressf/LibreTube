@@ -6,8 +6,40 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:paddingHorizontal="24dp"
-    android:paddingTop="8dp"
     android:paddingBottom="12dp">
+
+    <!-- the only controls in reader view, they scroll away with the text -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="-12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/articleMinimize"
+            style="?attr/materialIconButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/tooltip_minimize"
+            android:tooltipText="@string/tooltip_minimize"
+            app:icon="@drawable/ic_arrow_down" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/articleShowPlayer"
+            style="?attr/materialIconButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/reader_show_player"
+            android:tooltipText="@string/reader_show_player"
+            app:icon="@drawable/ic_headphones" />
+
+    </LinearLayout>
 
     <TextView
         android:id="@+id/articleTitle"
@@ -66,7 +98,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="@string/reading_mode_no_punctuation"
+        android:text="@string/reader_no_punctuation"
         android:textColor="?android:textColorSecondary"
         android:textSize="13sp"
         android:textStyle="italic"

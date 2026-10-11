@@ -1,6 +1,7 @@
 package com.github.libretube.helpers
 
 import android.content.Context
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.Format
@@ -9,9 +10,11 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.extractor.text.DefaultSubtitleParserFactory
 import androidx.media3.extractor.text.SubtitleParser
 import com.github.libretube.R
+import com.github.libretube.api.obj.Streams
 import com.github.libretube.api.obj.Subtitle
 import com.github.libretube.obj.TranscriptLine
 import com.github.libretube.util.TranscriptMerger
+import com.github.libretube.util.TtmlTranscriptParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 import okhttp3.OkHttpClient
@@ -24,6 +27,22 @@ object TranscriptHelper {
     // a plain client, since the debug logging of the API clients would dump whole subtitle files
     private val httpClient by lazy { OkHttpClient() }
 
+    private const val CACHE_SIZE = 8
+
+    // recently loaded transcripts by subtitle url, so that e.g. switching back to a language or
+    // re-opening reader view for the same video is instant
+    private val cache = object : LinkedHashMap<String, List<TranscriptLine>>(CACHE_SIZE, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<TranscriptLine>>?) =
+            size > CACHE_SIZE
+    }
+
+    /**
+     * Whether reader view can show a transcript for these streams.
+     */
+    fun hasTranscript(streams: Streams) =
+        // live streams don't provide a complete subtitle file
+        !streams.isLive && streams.subtitles.any { it.url != null }
+
     /**
      * Download the given subtitle track and turn it into a list of transcript lines.
      *
@@ -34,6 +53,8 @@ object TranscriptHelper {
         // interruptible, so that the download stops when e.g. the user switches the language
         runInterruptible(Dispatchers.IO) {
             val url = subtitle.url ?: throw IllegalArgumentException("Subtitle has no url")
+            synchronized(cache) { cache[url] }?.let { return@runInterruptible it }
+
             val request = Request.Builder().url(url).build()
             val data = httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
@@ -41,12 +62,23 @@ object TranscriptHelper {
             }
 
             parseTranscript(data, subtitle.mimeType)
+                .also { lines -> synchronized(cache) { cache[url] = lines } }
         }
 
     fun parseTranscript(data: ByteArray, declaredMimeType: String?): List<TranscriptLine> {
+        // YouTube's captions are TTML, which Media3 parses far too slowly for long transcripts
+        val sniffedMimeType = sniffMimeType(data)
+        if (sniffedMimeType == MimeTypes.APPLICATION_TTML ||
+            (sniffedMimeType == null && normalizeMimeType(declaredMimeType) == MimeTypes.APPLICATION_TTML)
+        ) {
+            runCatching { TtmlTranscriptParser.parse(data) }
+                .onSuccess { slices -> return TranscriptMerger.merge(slices) }
+                .onFailure { Log.w(TAG, "Falling back to Media3 for TTML subtitles", it) }
+        }
+
         val parserFactory = DefaultSubtitleParserFactory()
 
-        val mimeType = listOfNotNull(sniffMimeType(data), normalizeMimeType(declaredMimeType))
+        val mimeType = listOfNotNull(sniffedMimeType, normalizeMimeType(declaredMimeType))
             .firstOrNull { parserFactory.supportsFormat(formatOf(it)) }
             ?: throw IllegalArgumentException("Unsupported subtitle format: $declaredMimeType")
 
@@ -119,4 +151,6 @@ object TranscriptHelper {
             else -> null
         }
     }
+
+    private const val TAG = "TranscriptHelper"
 }

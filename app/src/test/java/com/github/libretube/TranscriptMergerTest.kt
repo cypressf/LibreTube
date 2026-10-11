@@ -114,19 +114,4 @@ class TranscriptMergerTest {
         )
         assertEquals(listOf(TranscriptLine(0, "a"), TranscriptLine(2000, "b")), lines)
     }
-
-    @Test
-    fun testIndexAt() {
-        val lines = listOf(
-            TranscriptLine(1000, "a"),
-            TranscriptLine(3000, "b"),
-            TranscriptLine(5000, "c")
-        )
-        assertEquals(-1, TranscriptMerger.indexAt(lines, 0))
-        assertEquals(0, TranscriptMerger.indexAt(lines, 1000))
-        assertEquals(0, TranscriptMerger.indexAt(lines, 2999))
-        assertEquals(1, TranscriptMerger.indexAt(lines, 3000))
-        assertEquals(2, TranscriptMerger.indexAt(lines, 99_000))
-        assertEquals(-1, TranscriptMerger.indexAt(emptyList(), 1000))
-    }
 }

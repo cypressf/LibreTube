@@ -31,7 +31,6 @@ import com.github.libretube.api.JsonHelper
 import com.github.libretube.api.obj.ChapterSegment
 import com.github.libretube.api.obj.Streams
 import com.github.libretube.constants.IntentData
-import com.github.libretube.constants.PreferenceKeys
 import com.github.libretube.databinding.FragmentAudioPlayerBinding
 import com.github.libretube.enums.PlayerCommand
 import com.github.libretube.extensions.navigateVideo
@@ -46,7 +45,6 @@ import com.github.libretube.helpers.ClipboardHelper
 import com.github.libretube.helpers.ImageHelper
 import com.github.libretube.helpers.NavigationHelper
 import com.github.libretube.helpers.PlayerHelper
-import com.github.libretube.helpers.PreferenceHelper
 import com.github.libretube.helpers.ThemeHelper
 import com.github.libretube.helpers.TranscriptHelper
 import com.github.libretube.obj.TranscriptLine
@@ -62,6 +60,7 @@ import com.github.libretube.ui.interfaces.AudioPlayerOptions
 import com.github.libretube.ui.listeners.AudioPlayerThumbnailListener
 import com.github.libretube.ui.models.ChaptersViewModel
 import com.github.libretube.ui.models.CommonPlayerViewModel
+import com.github.libretube.ui.models.ReaderStyle
 import com.github.libretube.ui.models.TranscriptViewModel
 import com.github.libretube.ui.sheets.BaseBottomSheet
 import com.github.libretube.ui.sheets.ChaptersBottomSheet
@@ -90,15 +89,15 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
     private val transcriptViewModel: TranscriptViewModel by activityViewModels()
 
     /**
-     * Whether the transcript is shown as an article instead of the thumbnail.
+     * Whether the transcript is shown as an article instead of the player controls.
      */
-    private var isReadingMode = false
+    private var isReaderView = false
     private var formatJob: Job? = null
     private var formatJobInput: FormatInput? = null
     private var formattedArticle: FormattedArticle? = null
 
     /**
-     * Whether to tell the user that there's no transcript, after they turned reading mode on.
+     * Whether to tell the user that there's no transcript, after they opened reader view.
      */
     private var showNoTranscriptHint = false
 
@@ -176,10 +175,7 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
             true
         }
 
-        binding.minimizePlayer.setOnClickListener {
-            activity.minimizePlayerContainerLayout()
-            binding.playerMotionLayout.transitionToEnd()
-        }
+        binding.minimizePlayer.setOnClickListener { minimize() }
 
         binding.autoPlay.isChecked = PlayerHelper.autoPlayEnabled
         binding.autoPlay.setOnCheckedChangeListener { _, isChecked ->
@@ -279,7 +275,7 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
 
         updateChapterIndex()
 
-        initializeReadingMode()
+        initializeReaderView()
 
         val onBackPressedCallback = object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -407,8 +403,9 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
         metadata.artworkUri?.let { updateThumbnailAsync(it) }
 
         initializeSeekBar()
+        updateReaderButton()
 
-        if (isReadingMode) {
+        if (isReaderView) {
             loadTranscript()
             renderArticle()
         }
@@ -475,7 +472,7 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
             (currentPosition / 1000).toLong()
         )
 
-        if (isReadingMode && viewModel.isMiniPlayerVisible.value != true) {
+        if (isReaderView && viewModel.isMiniPlayerVisible.value != true) {
             binding.articleReader.updatePosition(currentPosition.toLong())
         }
 
@@ -534,48 +531,85 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
         updateKeepScreenOn()
     }
 
-    private fun initializeReadingMode() {
+    private fun minimize() {
+        activity.minimizePlayerContainerLayout()
+        binding.playerMotionLayout.transitionToEnd()
+    }
+
+    private fun initializeReaderView() {
         binding.articleReader.onSeek = { positionMs -> playerController?.seekTo(positionMs) }
         binding.articleReader.onLanguageClick = { showTranscriptLanguageSelection() }
         binding.articleReader.onRetry = { transcriptViewModel.retry() }
+        binding.articleReader.onMinimize = { minimize() }
+        binding.articleReader.onShowPlayer = { setReaderView(false) }
 
-        // downloaded videos don't have a transcript to read
-        binding.readingMode.isVisible = !isOffline
-        binding.readingMode.isChecked = !isOffline &&
-            PreferenceHelper.getBoolean(PreferenceKeys.AUDIO_PLAYER_READING_MODE, false)
-        binding.readingMode.addOnCheckedChangeListener { _, isChecked ->
-            PreferenceHelper.putBoolean(PreferenceKeys.AUDIO_PLAYER_READING_MODE, isChecked)
-            showNoTranscriptHint = isChecked
-            setReadingMode(isChecked)
+        binding.openReaderView.setOnClickListener {
+            showNoTranscriptHint = true
+            setReaderView(true)
         }
+        updateReaderButton()
 
         transcriptViewModel.state.observe(viewLifecycleOwner) { renderArticle() }
 
-        setReadingMode(binding.readingMode.isChecked)
+        // downloaded videos don't have a transcript to read
+        setReaderView(!isOffline && requireArguments().getBoolean(IntentData.readerView, false))
     }
 
-    private fun setReadingMode(enabled: Boolean) {
-        isReadingMode = enabled
+    /**
+     * Show the transcript as an article instead of the player, e.g. when the user opened the video
+     * with "Read" while this player was already running.
+     */
+    fun showReaderView() {
+        if (isOffline) return
+        showNoTranscriptHint = true
+        setReaderView(true)
+    }
+
+    private fun setReaderView(enabled: Boolean) {
+        isReaderView = enabled
+        // remember the mode, so that it survives e.g. rotating the screen
+        requireArguments().putBoolean(IntentData.readerView, enabled)
+
         if (enabled) loadTranscript()
         renderArticle()
         updateKeepScreenOn()
     }
 
     /**
-     * Show either the article or the thumbnail, depending on whether reading mode is on and
-     * whether there's a transcript to read.
+     * Only offer reader view for videos that have a transcript.
+     */
+    private fun updateReaderButton() {
+        val binding = _binding ?: return
+        val streams = getCurrentStreams()
+        binding.openReaderView.isVisible =
+            !isOffline && streams != null && TranscriptHelper.hasTranscript(streams)
+    }
+
+    /**
+     * Show either the article on its own, using the full height, or the player as usual.
      */
     private fun updateReaderVisibility(showReader: Boolean) {
         val binding = _binding ?: return
-        binding.thumbnailContainer.isInvisible = showReader
-        binding.titleLayout.isGone = showReader
         binding.articleReader.isVisible = showReader
+        binding.thumbnailContainer.isInvisible = showReader
+        for (view in listOf(
+            binding.topBar, binding.titleLayout, binding.seekBarLayout, binding.timeLayout,
+            binding.buttonGroup, binding.bottomBar
+        )) {
+            view.isGone = showReader
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // the font settings might have changed while the player was in the background
+        _binding?.articleReader?.setStyle(ReaderStyle.fromPreferences(requireContext()))
     }
 
     private fun updateKeepScreenOn() {
         val binding = _binding ?: return
         // reading along shouldn't be interrupted by the screen turning off
-        binding.articleReader.keepScreenOn = isReadingMode &&
+        binding.articleReader.keepScreenOn = isReaderView &&
             binding.articleReader.isVisible &&
             viewModel.isMiniPlayerVisible.value != true &&
             playerController?.isPlaying == true
@@ -584,18 +618,23 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
     private fun getCurrentVideoId(): String? =
         playerController?.mediaMetadata?.extras?.getString(IntentData.videoId)
 
+    private fun getCurrentStreams(): Streams? =
+        playerController?.mediaMetadata?.extras?.getString(IntentData.streams)?.let {
+            runCatching { JsonHelper.json.decodeFromString<Streams>(it) }.getOrNull()
+        }
+
     /**
      * Start loading the transcript of the current video, if it isn't loaded already.
      */
     private fun loadTranscript() {
-        val extras = playerController?.mediaMetadata?.extras ?: return
-        val videoId = extras.getString(IntentData.videoId) ?: return
-        val streams = extras.getString(IntentData.streams)?.let {
-            runCatching { JsonHelper.json.decodeFromString<Streams>(it) }.getOrNull()
-        }
+        val videoId = getCurrentVideoId() ?: return
+        val streams = getCurrentStreams()
 
-        // live streams don't provide a complete subtitle file
-        val subtitles = if (streams == null || streams.isLive) emptyList() else streams.subtitles
+        val subtitles = if (streams != null && TranscriptHelper.hasTranscript(streams)) {
+            streams.subtitles
+        } else {
+            emptyList()
+        }
         transcriptViewModel.setVideo(videoId, subtitles, PlayerHelper.defaultSubtitleCode)
     }
 
@@ -627,7 +666,7 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
      */
     private fun renderArticle() {
         val binding = _binding ?: return
-        if (!isReadingMode) {
+        if (!isReaderView) {
             formatJob?.cancel()
             updateReaderVisibility(false)
             updateKeepScreenOn()
@@ -679,7 +718,7 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
             is TranscriptViewModel.State.Loaded -> showFormattedArticle(state.lines)
         }
 
-        // only hint once after the user turned reading mode on
+        // only hint once after the user opened reader view
         if (state != null && state != TranscriptViewModel.State.Loading) showNoTranscriptHint = false
     }
 
@@ -711,7 +750,7 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
 
             // the transcript might have changed while formatting
             val currentLines = (transcriptViewModel.state.value as? TranscriptViewModel.State.Loaded)?.lines
-            if (currentLines === lines && isReadingMode) showArticle(article)
+            if (currentLines === lines && isReaderView) showArticle(article)
         }
     }
 

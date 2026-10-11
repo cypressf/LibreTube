@@ -27,6 +27,7 @@
         app:layout_constraintTop_toTopOf="@id/audio_player_container">
 
         <LinearLayout
+            android:id="@+id/topBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:padding="20dp">
@@ -45,15 +46,14 @@
                 android:layout_weight="1" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/readingMode"
+                android:id="@+id/openReaderView"
                 style="?attr/materialIconButtonFilledTonalStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
                 android:layout_marginEnd="12dp"
-                android:checkable="true"
-                android:contentDescription="@string/reading_mode"
-                android:tooltipText="@string/reading_mode"
+                android:contentDescription="@string/reader_view"
+                android:tooltipText="@string/reader_view"
                 app:icon="@drawable/ic_article"
                 tools:targetApi="o" />
 
@@ -165,6 +165,7 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/seekBarLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center_vertical"
@@ -198,6 +199,7 @@
         </LinearLayout>
 
         <FrameLayout
+            android:id="@+id/timeLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingHorizontal="40dp">
@@ -265,6 +267,7 @@
         </com.google.android.material.button.MaterialButtonGroup>
 
         <FrameLayout
+            android:id="@+id/bottomBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center"

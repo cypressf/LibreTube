@@ -61,6 +61,7 @@ object IntentData {
     const val showUpcoming = "showUpcoming"
     const val customInstance = "customInstance"
     const val audioOnly = "audioOnly"
+    const val readerView = "readerView"
     const val category = "category"
     const val outputUri = "outputUri"
 }
