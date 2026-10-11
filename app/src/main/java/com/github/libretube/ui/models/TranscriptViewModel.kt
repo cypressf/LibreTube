@@ -39,13 +39,14 @@ class TranscriptViewModel : ViewModel() {
      * has been picked in reader view before
      */
     fun setVideo(videoId: String, subtitles: List<Subtitle>, preferredLanguage: String?) {
-        if (videoId == this.videoId && state.value != null) return
+        val sortedSubtitles = sortSubtitles(subtitles)
+        if (videoId == this.videoId && sortedSubtitles == this.subtitles && state.value != null) return
 
         // keep the language the user picked for the previous video
         val language = selectedSubtitle?.code ?: preferredLanguage
 
         this.videoId = videoId
-        this.subtitles = sortSubtitles(subtitles)
+        this.subtitles = sortedSubtitles
         selectSubtitle(pickDefaultSubtitle(language))
     }
 

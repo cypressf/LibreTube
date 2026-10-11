@@ -97,9 +97,14 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
     private var formattedArticle: FormattedArticle? = null
 
     /**
-     * Whether to tell the user that there's no transcript, after they opened reader view.
+     * Whether reader view is only on because of the "open in reader view" setting. Videos without
+     * a transcript are then shown as videos, as if the setting was off.
      */
-    private var showNoTranscriptHint = false
+    private var isReaderViewDefault = false
+    private var isSwitchingToVideo = false
+
+    // the video the user was last told has no transcript, to only tell them once per video
+    private var noTranscriptToastVideoId: String? = null
 
     /**
      * What an article is formatted from, to avoid formatting the same transcript again.
@@ -541,16 +546,20 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
         binding.articleReader.onLanguageClick = { showTranscriptLanguageSelection() }
         binding.articleReader.onRetry = { transcriptViewModel.retry() }
         binding.articleReader.onMinimize = { minimize() }
-        binding.articleReader.onShowPlayer = { setReaderView(false) }
+        binding.articleReader.onShowPlayer = {
+            isReaderViewDefault = false
+            setReaderView(false)
+        }
 
         binding.openReaderView.setOnClickListener {
-            showNoTranscriptHint = true
+            isReaderViewDefault = false
             setReaderView(true)
         }
         updateReaderButton()
 
         transcriptViewModel.state.observe(viewLifecycleOwner) { renderArticle() }
 
+        isReaderViewDefault = requireArguments().getBoolean(IntentData.readerViewIsDefault, false)
         // downloaded videos don't have a transcript to read
         setReaderView(!isOffline && requireArguments().getBoolean(IntentData.readerView, false))
     }
@@ -559,9 +568,10 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
      * Show the transcript as an article instead of the player, e.g. when the user opened the video
      * with "Read" while this player was already running.
      */
-    fun showReaderView() {
+    fun showReaderView(isDefault: Boolean) {
         if (isOffline) return
-        showNoTranscriptHint = true
+        // the user explicitly asked for reader view before, keep treating it as explicit
+        isReaderViewDefault = isDefault && (!isReaderView || isReaderViewDefault)
         setReaderView(true)
     }
 
@@ -569,6 +579,7 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
         isReaderView = enabled
         // remember the mode, so that it survives e.g. rotating the screen
         requireArguments().putBoolean(IntentData.readerView, enabled)
+        requireArguments().putBoolean(IntentData.readerViewIsDefault, isReaderViewDefault)
 
         if (enabled) loadTranscript()
         renderArticle()
@@ -697,7 +708,14 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
                 binding.articleReader.showLoading(buildArticleHeader(null))
 
             TranscriptViewModel.State.Empty -> if (hasNoSubtitles) {
-                if (showNoTranscriptHint) {
+                if (isReaderViewDefault) {
+                    // reader view is only on by default: play the video as usual instead
+                    if (!isSwitchingToVideo) {
+                        isSwitchingToVideo = true
+                        switchToVideoMode(currentVideoId)
+                    }
+                } else if (noTranscriptToastVideoId != currentVideoId) {
+                    noTranscriptToastVideoId = currentVideoId
                     Toast.makeText(context, R.string.transcript_unavailable, Toast.LENGTH_SHORT)
                         .show()
                 }
@@ -717,9 +735,6 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
 
             is TranscriptViewModel.State.Loaded -> showFormattedArticle(state.lines)
         }
-
-        // only hint once after the user opened reader view
-        if (state != null && state != TranscriptViewModel.State.Loading) showNoTranscriptHint = false
     }
 
     private fun showFormattedArticle(lines: List<TranscriptLine>) {

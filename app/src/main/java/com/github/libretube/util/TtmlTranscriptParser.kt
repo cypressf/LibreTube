@@ -5,6 +5,7 @@ import org.xml.sax.InputSource
 import org.xml.sax.helpers.DefaultHandler
 import java.io.ByteArrayInputStream
 import javax.xml.parsers.SAXParserFactory
+import kotlin.math.roundToLong
 
 /**
  * A minimal, single-pass parser for TTML subtitles, which is the format YouTube's captions use.
@@ -30,6 +31,13 @@ object TtmlTranscriptParser {
      * can't be parsed, so that the caller can fall back to another parser
      */
     fun parse(data: ByteArray): List<TranscriptMerger.CueSlice> {
+        // captions never need a DTD, and Android's XML parser can't be told to ignore one, which
+        // would allow e.g. entity expansion attacks
+        val head = String(data, 0, minOf(data.size, 1024), Charsets.UTF_8)
+        if (head.contains("<!DOCTYPE", ignoreCase = true)) {
+            throw IllegalArgumentException("TTML with a DOCTYPE isn't supported")
+        }
+
         val handler = Handler()
         val factory = SAXParserFactory.newInstance().apply { isNamespaceAware = true }
         // don't resolve external entities, the document comes from the network
@@ -142,7 +150,7 @@ object TtmlTranscriptParser {
                     (hours.toLong() * 3600 + minutes.toLong() * 60 + seconds.toLong()).toDouble()
                 match.groups[4]?.value?.let { fraction -> totalSeconds += fraction.toDouble() }
                 match.groups[5]?.value?.let { frames -> totalSeconds += frames.toDouble() / frameRate }
-                return (totalSeconds * 1000).toLong()
+                return (totalSeconds * 1000).roundToLong()
             }
 
             offsetTime.matchEntire(value)?.let { match ->
@@ -156,7 +164,7 @@ object TtmlTranscriptParser {
                     "f" -> number / frameRate * 1000
                     else -> number / tickRate * 1000
                 }
-                return milliseconds.toLong()
+                return milliseconds.roundToLong()
             }
 
             throw IllegalArgumentException("Unsupported TTML time: $time")

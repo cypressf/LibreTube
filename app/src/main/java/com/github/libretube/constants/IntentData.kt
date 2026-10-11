@@ -62,6 +62,7 @@ object IntentData {
     const val customInstance = "customInstance"
     const val audioOnly = "audioOnly"
     const val readerView = "readerView"
+    const val readerViewIsDefault = "readerViewIsDefault"
     const val category = "category"
     const val outputUri = "outputUri"
 }

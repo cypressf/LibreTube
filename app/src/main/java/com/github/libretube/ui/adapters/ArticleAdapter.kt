@@ -143,6 +143,8 @@ class ArticleAdapter(
                 articleTitle.applyStyle(style.typeface, style.titleSizeSp, bold = true)
                 articleAuthor.applyStyle(style.typeface, style.metaSizeSp * 1.12f)
                 articleMeta.applyStyle(style.typeface, style.metaSizeSp)
+                articleNote.applyStyle(style.typeface, style.metaSizeSp * 0.9f)
+                articleMessage.applyStyle(style.typeface, style.metaSizeSp * 1.12f)
             }
 
             articleTitle.text = header.title

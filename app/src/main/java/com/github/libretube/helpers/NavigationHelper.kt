@@ -58,9 +58,10 @@ object NavigationHelper {
     ) {
         // reader view plays the audio while showing the transcript, so it's a form of audio mode;
         // downloaded videos don't have a transcript to read
-        val readerViewDefault =
-            PreferenceHelper.getBoolean(PreferenceKeys.READER_VIEW_DEFAULT, false) && !forceVideo
-        val readerView = (readerViewRequested || readerViewDefault) && !playerData.isOffline
+        // an explicit request for audio or video wins over the default
+        val readerViewDefault = PreferenceHelper.getBoolean(PreferenceKeys.READER_VIEW_DEFAULT, false) &&
+            !forceVideo && !audioOnlyPlayerRequested && !readerViewRequested
+        val readerView = !playerData.isOffline && (readerViewRequested || readerViewDefault)
 
         // attempt to attach to the current media session first by using the corresponding
         // video/audio player instance
@@ -74,7 +75,8 @@ object NavigationHelper {
                 PlayingQueue.clearAfterCurrent()
                 this.playVideo(playerData.videoId.toID())
 
-                if (readerView) {
+                // like audio only mode, the default doesn't take over a running video player
+                if (readerViewRequested && !playerData.isOffline) {
                     this.switchToReaderView()
                 } else if (audioOnlyPlayerRequested) {
                     // switch to audio only player
@@ -105,7 +107,7 @@ object NavigationHelper {
                 // switch to video only player
                 this.switchToVideoMode(playerData.videoId.toID())
             } else {
-                if (readerView) this.showReaderView()
+                if (readerView) this.showReaderView(isDefault = readerViewDefault)
                 // maximize player
                 this.binding.playerMotionLayout.transitionToStart()
             }
@@ -124,7 +126,8 @@ object NavigationHelper {
                 offlinePlayer = playerData.isOffline,
                 // reader view is for reading, so show it right away
                 minimizeByDefault = !readerView,
-                readerView = readerView
+                readerView = readerView,
+                readerViewIsDefault = readerView && readerViewDefault
             )
         } else {
             openVideoPlayerFragment(
@@ -151,14 +154,16 @@ object NavigationHelper {
         context: Context,
         offlinePlayer: Boolean = false,
         minimizeByDefault: Boolean = false,
-        readerView: Boolean = false
+        readerView: Boolean = false,
+        readerViewIsDefault: Boolean = false
     ) {
         val activity = ContextHelper.unwrapActivity<BaseActivity>(context)
         activity.supportFragmentManager.commitNow {
             val args = bundleOf(
                 IntentData.minimizeByDefault to minimizeByDefault,
                 IntentData.offlinePlayer to offlinePlayer,
-                IntentData.readerView to readerView
+                IntentData.readerView to readerView,
+                IntentData.readerViewIsDefault to readerViewIsDefault
             )
             replace<AudioPlayerFragment>(R.id.container, args = args)
         }

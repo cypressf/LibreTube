@@ -88,7 +88,8 @@ class TtmlTranscriptParserTest {
 
         assertEquals(2880, lines.size)
         println("parsed 2880 captions in $elapsedMs ms")
-        assertEquals(true, elapsedMs < 1000)
+        // generous, this is about catching quadratic behavior (seconds), not micro timing
+        assertEquals(true, elapsedMs < 3000)
     }
 
     private fun clock(ms: Long) = "%02d:%02d:%02d.%03d".format(

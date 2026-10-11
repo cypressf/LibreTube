@@ -800,11 +800,19 @@ class PlayerFragment : Fragment(R.layout.fragment_player), CustomPlayerCallback 
      * Continue playback in the audio player, showing the transcript as an article.
      */
     fun switchToReaderView() {
-        // start loading the transcript right away, so that it's ready sooner
-        if (this::streams.isInitialized && TranscriptHelper.hasTranscript(streams)) {
+        // start loading the transcript right away, so that it's ready sooner; take the id and the
+        // streams from the player, they're only updated together there while a video loads
+        val extras = playerController.mediaMetadata.extras
+        val playingVideoId = extras?.getString(IntentData.videoId)
+        val playingStreams = extras?.getString(IntentData.streams)?.let {
+            runCatching { JsonHelper.json.decodeFromString<Streams>(it) }.getOrNull()
+        }
+        if (playingVideoId != null && playingStreams != null &&
+            TranscriptHelper.hasTranscript(playingStreams)
+        ) {
             transcriptViewModel.setVideo(
-                videoId,
-                streams.subtitles,
+                playingVideoId,
+                playingStreams.subtitles,
                 PlayerHelper.defaultSubtitleCode
             )
         }
