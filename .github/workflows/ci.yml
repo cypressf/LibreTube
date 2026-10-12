@@ -35,7 +35,16 @@ jobs:
 
       - name: Compile
         run: |
-          ./gradlew assembleDebug
+          set -o pipefail
+          ./gradlew assembleDebug 2>&1 | tee build.log
+
+      # forks: surface build errors as annotations, which can be read without downloading logs
+      - name: Report build errors
+        if: failure()
+        run: |
+          grep -E "^e: |error:|What went wrong|AAPT|Could not|> " build.log | head -40 | while IFS= read -r line; do
+            echo "::error::${line//%/%25}"
+          done
 
       - name: Sign Apk
         continue-on-error: true
