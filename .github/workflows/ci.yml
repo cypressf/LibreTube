@@ -42,9 +42,13 @@ jobs:
       - name: Report build errors
         if: failure()
         run: |
-          grep -E "^e: |error:|What went wrong|AAPT|Could not|> " build.log | head -40 | while IFS= read -r line; do
-            echo "::error::${line//%/%25}"
-          done
+          {
+            grep -E "^e: " build.log | head -20
+            sed -n '/What went wrong/,/^\* Try/p' build.log | head -40
+            grep -E "ERROR:|error: " build.log | head -10
+          } > errors.txt
+          msg=$(sed -e 's/%/%25/g' errors.txt | awk '{printf "%s%%0A", $0}')
+          echo "::error::${msg:0:6000}"
 
       - name: Sign Apk
         continue-on-error: true
