@@ -477,10 +477,6 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
             (currentPosition / 1000).toLong()
         )
 
-        if (isReaderView && viewModel.isMiniPlayerVisible.value != true) {
-            binding.articleReader.updatePosition(currentPosition.toLong())
-        }
-
         // update the time bar current value and maximum value
         binding.timeBar.valueTo = (duration / 1000).toFloat()
         binding.timeBar.value = clamp(
@@ -534,6 +530,9 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
         updatePlayPauseButton()
         initializeSeekBar()
         updateKeepScreenOn()
+
+        // reader view is for reading, not listening
+        if (isReaderView) playerController?.pause()
     }
 
     private fun minimize() {
@@ -542,7 +541,6 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
     }
 
     private fun initializeReaderView() {
-        binding.articleReader.onSeek = { positionMs -> playerController?.seekTo(positionMs) }
         binding.articleReader.onLanguageClick = { showTranscriptLanguageSelection() }
         binding.articleReader.onRetry = { transcriptViewModel.retry() }
         binding.articleReader.onMinimize = { minimize() }
@@ -581,7 +579,12 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
         requireArguments().putBoolean(IntentData.readerView, enabled)
         requireArguments().putBoolean(IntentData.readerViewIsDefault, isReaderViewDefault)
 
-        if (enabled) loadTranscript()
+        if (enabled) {
+            // reader view is for reading, not listening; the audio can still be started from the
+            // player controls or the notification
+            playerController?.pause()
+            loadTranscript()
+        }
         renderArticle()
         updateKeepScreenOn()
     }
@@ -619,11 +622,10 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
 
     private fun updateKeepScreenOn() {
         val binding = _binding ?: return
-        // reading along shouldn't be interrupted by the screen turning off
+        // reading shouldn't be interrupted by the screen turning off
         binding.articleReader.keepScreenOn = isReaderView &&
             binding.articleReader.isVisible &&
-            viewModel.isMiniPlayerVisible.value != true &&
-            playerController?.isPlaying == true
+            viewModel.isMiniPlayerVisible.value != true
     }
 
     private fun getCurrentVideoId(): String? =
@@ -712,6 +714,8 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
                     // reader view is only on by default: play the video as usual instead
                     if (!isSwitchingToVideo) {
                         isSwitchingToVideo = true
+                        // reader view kept it paused, play the video like it normally would
+                        if (PlayerHelper.playAutomatically) playerController?.play()
                         switchToVideoMode(currentVideoId)
                     }
                 } else if (noTranscriptToastVideoId != currentVideoId) {
@@ -771,11 +775,7 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
 
     private fun showArticle(article: ArticleFormatter.Article) {
         val binding = _binding ?: return
-        binding.articleReader.showArticle(
-            buildArticleHeader(article),
-            article,
-            playerController?.currentPosition ?: 0
-        )
+        binding.articleReader.showArticle(buildArticleHeader(article), article)
     }
 
     private fun showTranscriptLanguageSelection() {

@@ -579,7 +579,6 @@
     <string name="transcript_load_failed">The transcript could not be loaded.</string>
     <string name="reader_view">Reader view</string>
     <string name="read">Read</string>
-    <string name="reader_jump_to_current">Back to current</string>
     <string name="reader_no_punctuation">These captions have no punctuation, so the paragraph breaks are approximate.</string>
     <string name="reader_show_player">Show player</string>
     <string name="reader_view_default">Open in reader view</string>

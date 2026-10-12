@@ -108,6 +108,13 @@ object ArticleFormatter {
     private const val CHAPTER_TOLERANCE_MS = 1000L
 
     private val whitespace = Regex("\\s+")
+
+    // ellipses in captions usually mark where a sentence continues in the next caption, or a pause
+    private val leadingEllipsis = Regex("^(?:\\.{3,}|…)\\s*")
+    private val trailingEllipsis = Regex("\\s*(?:\\.{3,}|…)$")
+    private val innerEllipsis = Regex("\\s*(?:\\.{3,}|…)\\s*(?=[\\p{L}\\p{N}\"'“‘(])")
+    private val startsWithI = Regex("^[\"'“‘(]?I(?:'[a-z]+)?\\b")
+    private val endsWithPunctuation = Regex("[.!?,;:—–-][\"'”’)\\]]*$")
     private val soundTag = Regex("\\[[^\\]]{0,40}]")
     private val soundOnlyLine = Regex("^\\([^)]{0,40}\\)$")
     private val musicNotes = Regex("[♪♫♬]")
@@ -166,6 +173,47 @@ object ArticleFormatter {
                 .trim()
             if (text.isEmpty()) null else CaptionUnit(line.startMs, text, startsNewSpeaker)
         }
+        .let(::normalizeEllipses)
+
+    /**
+     * Captions often use "..." where a sentence continues in the next caption ("average it out..."
+     * followed by "to somewhere in the range") or for a short pause. In an article they're noise
+     * and would end paragraphs mid-sentence, so they become a space, or a period if a new sentence
+     * follows.
+     */
+    private fun normalizeEllipses(units: List<CaptionUnit>): List<CaptionUnit> {
+        val texts = units.map { it.text.replace(leadingEllipsis, "") }
+
+        return units.mapIndexedNotNull { index, unit ->
+            var text = texts[index]
+
+            if (trailingEllipsis.containsMatchIn(text)) {
+                text = text.replace(trailingEllipsis, "")
+                val next = texts.drop(index + 1).firstOrNull { it.isNotBlank() }
+                val endsSentence = next == null || startsNewSentence(next)
+                if (endsSentence && text.isNotEmpty() && !endsWithPunctuation.containsMatchIn(text)) {
+                    text += "."
+                }
+            }
+
+            text = innerEllipsis.replace(text) { match ->
+                val following = text.substring(match.range.last + 1)
+                if (startsNewSentence(following)) ". " else " "
+            }.trim()
+
+            if (text.isEmpty()) null else unit.copy(text = text)
+        }
+    }
+
+    /**
+     * Whether text after an ellipsis starts a new sentence: it starts with a capital letter, other
+     * than the word "I", which is just as likely to continue the sentence.
+     */
+    private fun startsNewSentence(text: String): Boolean {
+        val trimmed = text.trimStart()
+        val firstLetter = trimmed.firstOrNull { it.isLetterOrDigit() } ?: return false
+        return firstLetter.isUpperCase() && !startsWithI.containsMatchIn(trimmed)
+    }
 
     private fun splitIntoSections(
         units: List<CaptionUnit>,

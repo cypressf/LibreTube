@@ -816,6 +816,8 @@ class PlayerFragment : Fragment(R.layout.fragment_player), CustomPlayerCallback 
                 PlayerHelper.defaultSubtitleCode
             )
         }
+        // reader view is for reading, not listening
+        playerController.pause()
         switchToAudioMode(readerView = true)
     }
 

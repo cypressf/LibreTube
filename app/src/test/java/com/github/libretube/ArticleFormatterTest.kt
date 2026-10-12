@@ -139,6 +139,36 @@ class ArticleFormatterTest {
     }
 
     @Test
+    fun testCaptionEllipsesBecomeProse() {
+        // shaped like the professional captions of an MKBHD video
+        val article = ArticleFormatter.format(
+            listOf(
+                line(0.0, "Just get a Chromebook. They're not going anywhere..."),
+                line(2.0, "College. Okay, there's a little bit more nuance here."),
+                line(4.0, "And so I think I can kind of average it out..."),
+                line(6.0, "to somewhere in the B- range."),
+                line(8.0, "But the second there's that like one app... that you need"),
+                line(10.0, "that's not in the Play Store... then..."),
+                line(12.0, "...that kind of makes this a non-option."),
+                line(14.0, "Wait... I mean... What?"),
+                line(16.0, "And that's it…")
+            )
+        )
+        assertEquals(
+            listOf(
+                "Just get a Chromebook. They're not going anywhere. College. Okay, there's a " +
+                    "little bit more nuance here. And so I think I can kind of average it out to " +
+                    "somewhere in the B- range. But the second there's that like one app that you " +
+                    "need that's not in the Play Store then that kind of makes this a non-option. " +
+                    "Wait I mean. What?",
+                // the paragraph is long enough to end at the next sentence end
+                "And that's it."
+            ),
+            paragraphs(article)
+        )
+    }
+
+    @Test
     fun testStandaloneIOnlyCapitalizedForEnglish() {
         val text = ArticleFormatter.format(
             listOf(line(0.0, "and i'm sure i said it")),

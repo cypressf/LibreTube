@@ -41,6 +41,7 @@ object BackgroundHelper {
     fun playOnBackground(
         context: Context,
         playerData: PlayerData,
+        startPaused: Boolean = false,
     ) {
         // close the previous video player if open
         val fragmentManager =
@@ -55,7 +56,8 @@ object BackgroundHelper {
         startMediaService(context, service, bundleOf(
             IntentData.playerData to playerData,
             IntentData.noInternet to noInternet,
-            IntentData.audioOnly to true
+            IntentData.audioOnly to true,
+            IntentData.startPaused to startPaused
         ))
     }
 

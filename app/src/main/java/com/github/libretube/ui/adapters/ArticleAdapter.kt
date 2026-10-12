@@ -2,15 +2,10 @@ package com.github.libretube.ui.adapters
 
 import android.annotation.SuppressLint
 import android.graphics.Typeface
-import android.text.Spannable
-import android.text.SpannableString
-import android.text.style.BackgroundColorSpan
 import android.util.TypedValue
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.ViewGroup
 import android.widget.TextView
-import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
@@ -18,7 +13,6 @@ import com.github.libretube.databinding.ArticleHeaderRowBinding
 import com.github.libretube.databinding.ArticleHeadingRowBinding
 import com.github.libretube.databinding.ArticleParagraphRowBinding
 import com.github.libretube.helpers.ClipboardHelper
-import com.github.libretube.helpers.ThemeHelper
 import com.github.libretube.ui.models.ReaderStyle
 import com.github.libretube.util.ArticleFormatter
 
@@ -28,7 +22,6 @@ import com.github.libretube.util.ArticleFormatter
  * The first item is always the header, so the block at index i is at adapter position i + 1.
  */
 class ArticleAdapter(
-    private val onSeek: (positionMs: Long) -> Unit,
     private val onLanguageClick: () -> Unit,
     private val onRetry: () -> Unit,
     private val onMinimize: () -> Unit,
@@ -57,10 +50,7 @@ class ArticleAdapter(
         private set
     var blocks: List<ArticleFormatter.Block> = emptyList()
         private set
-    var currentLocation: ArticleFormatter.Location? = null
-        private set
-    var style: ReaderStyle? = null
-        private set
+    private var style: ReaderStyle? = null
 
     @SuppressLint("NotifyDataSetChanged")
     fun setStyle(style: ReaderStyle) {
@@ -73,24 +63,12 @@ class ArticleAdapter(
     fun submit(header: Header, blocks: List<ArticleFormatter.Block>) {
         this.header = header
         this.blocks = blocks
-        currentLocation = null
         notifyDataSetChanged()
     }
 
     fun updateHeader(header: Header) {
         this.header = header
         notifyItemChanged(0)
-    }
-
-    fun setCurrentLocation(location: ArticleFormatter.Location?) {
-        val old = currentLocation
-        if (old == location) return
-
-        currentLocation = location
-        old?.let { notifyItemChanged(it.blockIndex + 1, PAYLOAD_HIGHLIGHT) }
-        if (location != null && location.blockIndex != old?.blockIndex) {
-            notifyItemChanged(location.blockIndex + 1, PAYLOAD_HIGHLIGHT)
-        }
     }
 
     override fun getItemCount() = if (header == null) 0 else blocks.size + 1
@@ -114,22 +92,7 @@ class ArticleAdapter(
         when (holder) {
             is HeaderViewHolder -> bindHeader(holder)
             is HeadingViewHolder -> bindHeading(holder, blocks[position - 1] as ArticleFormatter.Heading)
-            is ParagraphViewHolder -> bindParagraph(holder, position - 1)
-        }
-    }
-
-    override fun onBindViewHolder(
-        holder: RecyclerView.ViewHolder,
-        position: Int,
-        payloads: MutableList<Any>
-    ) {
-        if (holder is ParagraphViewHolder && payloads.isNotEmpty() &&
-            payloads.all { it == PAYLOAD_HIGHLIGHT }
-        ) {
-            // only the highlight changed, keep the rest of the view as it is
-            updateHighlight(holder, position - 1)
-        } else {
-            onBindViewHolder(holder, position)
+            is ParagraphViewHolder -> bindParagraph(holder, blocks[position - 1] as ArticleFormatter.Paragraph)
         }
     }
 
@@ -167,103 +130,26 @@ class ArticleAdapter(
     }
 
     private fun bindHeading(holder: HeadingViewHolder, heading: ArticleFormatter.Heading) {
-        style?.let { holder.binding.headingText.applyStyle(it.typeface, it.headingSizeSp, bold = true) }
-        holder.binding.headingText.text = heading.title
-        ViewCompat.setAccessibilityHeading(holder.binding.root, true)
-        holder.binding.root.setOnClickListener { onSeek(heading.startMs) }
+        val textView = holder.binding.headingText
+        style?.let { textView.applyStyle(it.typeface, it.headingSizeSp, bold = true) }
+        textView.text = heading.title
+        ViewCompat.setAccessibilityHeading(textView, true)
     }
 
-    @SuppressLint("ClickableViewAccessibility")
-    private fun bindParagraph(holder: ParagraphViewHolder, blockIndex: Int) {
+    private fun bindParagraph(holder: ParagraphViewHolder, paragraph: ArticleFormatter.Paragraph) {
         val textView = holder.binding.paragraphText
         style?.let { textView.applyStyle(it.typeface, it.textSizeSp) }
+        textView.text = paragraph.text
 
-        updateHighlight(holder, blockIndex)
-        holder.lastTouchX = -1f
-        holder.lastTouchY = -1f
-
-        // remember where the paragraph was touched, so that a tap can seek to the line there
-        textView.setOnTouchListener { _, event ->
-            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
-                holder.lastTouchX = event.x
-                holder.lastTouchY = event.y
-            }
-            false
-        }
-        textView.setOnClickListener {
-            val paragraph = paragraphAt(holder) ?: return@setOnClickListener
-            // clicks from e.g. TalkBack or a keyboard don't have a touch position
-            val segment = if (holder.lastTouchX >= 0) {
-                val offset = textView.getOffsetForPosition(holder.lastTouchX, holder.lastTouchY)
-                paragraph.segments.getOrNull(paragraph.segmentAtOffset(offset))
-            } else {
-                null
-            } ?: paragraph.segments.first()
-            holder.lastTouchX = -1f
-            holder.lastTouchY = -1f
-            onSeek(segment.startMs)
-        }
         textView.setOnLongClickListener {
-            val paragraph = paragraphAt(holder) ?: return@setOnLongClickListener false
-            ClipboardHelper.save(textView.context, text = paragraph.text, notify = true)
+            ClipboardHelper.save(textView.context, text = textView.text.toString(), notify = true)
             true
         }
     }
 
-    private fun paragraphAt(holder: RecyclerView.ViewHolder): ArticleFormatter.Paragraph? {
-        val position = holder.bindingAdapterPosition
-        if (position == RecyclerView.NO_POSITION || position == 0) return null
-        return blocks.getOrNull(position - 1) as? ArticleFormatter.Paragraph
-    }
-
-    private fun updateHighlight(holder: ParagraphViewHolder, blockIndex: Int) {
-        val paragraph = blocks[blockIndex] as ArticleFormatter.Paragraph
-        val textView = holder.binding.paragraphText
-        val location = currentLocation
-
-        if (location == null || location.blockIndex != blockIndex) {
-            textView.text = paragraph.text
-            return
-        }
-
-        val segment = paragraph.segments.getOrNull(location.segmentIndex)
-        if (segment == null) {
-            textView.text = paragraph.text
-            return
-        }
-
-        val primary = ThemeHelper.getThemeColor(
-            textView.context,
-            androidx.appcompat.R.attr.colorPrimary
-        )
-        val highlight = ColorUtils.setAlphaComponent(primary, HIGHLIGHT_ALPHA)
-        textView.text = SpannableString(paragraph.text).apply {
-            setSpan(
-                BackgroundColorSpan(highlight),
-                segment.textStart,
-                segment.textEnd,
-                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-            )
-        }
-    }
-
-    /**
-     * The vertical position of the current line, relative to the top of [holder]'s item view,
-     * or null if [holder] doesn't show the current paragraph or it hasn't been laid out yet.
-     */
-    fun getCurrentLineTop(holder: RecyclerView.ViewHolder): Int? {
-        val location = currentLocation ?: return null
-        if (holder !is ParagraphViewHolder) return null
-        if (holder.bindingAdapterPosition != location.blockIndex + 1) return null
-        val paragraph = blocks.getOrNull(location.blockIndex) as? ArticleFormatter.Paragraph
-            ?: return null
-        val segment = paragraph.segments.getOrNull(location.segmentIndex) ?: return null
-
-        val textView = holder.binding.paragraphText
-        val layout = textView.layout ?: return null
-        val line = layout.getLineForOffset(segment.textStart.coerceAtMost(textView.text.length))
-        // the text view is the item view itself
-        return textView.totalPaddingTop + layout.getLineTop(line)
+    private fun TextView.applyStyle(typeface: Typeface, sizeSp: Float, bold: Boolean = false) {
+        setTypeface(typeface, if (bold) Typeface.BOLD else Typeface.NORMAL)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
     }
 
     class HeaderViewHolder(val binding: ArticleHeaderRowBinding) :
@@ -273,22 +159,11 @@ class ArticleAdapter(
         RecyclerView.ViewHolder(binding.root)
 
     class ParagraphViewHolder(val binding: ArticleParagraphRowBinding) :
-        RecyclerView.ViewHolder(binding.root) {
-        var lastTouchX = -1f
-        var lastTouchY = -1f
-    }
-
-    private fun TextView.applyStyle(typeface: Typeface, sizeSp: Float, bold: Boolean = false) {
-        setTypeface(typeface, if (bold) Typeface.BOLD else Typeface.NORMAL)
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
-    }
+        RecyclerView.ViewHolder(binding.root)
 
     companion object {
         private const val TYPE_HEADER = 0
         private const val TYPE_HEADING = 1
         private const val TYPE_PARAGRAPH = 2
-
-        private const val PAYLOAD_HIGHLIGHT = "highlight"
-        private const val HIGHLIGHT_ALPHA = 0x40
     }
 }

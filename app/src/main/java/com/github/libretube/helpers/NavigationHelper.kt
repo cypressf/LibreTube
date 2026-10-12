@@ -119,7 +119,7 @@ object NavigationHelper {
         if (audioOnlyPlayerRequested || readerView || (audioOnlyMode && !forceVideo)) {
             // in contrast to the video player, the audio player doesn't start a media service on
             // its own!
-            BackgroundHelper.playOnBackground(context, playerData)
+            BackgroundHelper.playOnBackground(context, playerData, startPaused = readerView)
 
             openAudioPlayerFragment(
                 context,

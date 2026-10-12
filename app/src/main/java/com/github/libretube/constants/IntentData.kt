@@ -63,6 +63,7 @@ object IntentData {
     const val audioOnly = "audioOnly"
     const val readerView = "readerView"
     const val readerViewIsDefault = "readerViewIsDefault"
+    const val startPaused = "startPaused"
     const val category = "category"
     const val outputUri = "outputUri"
 }
