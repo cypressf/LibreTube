@@ -206,6 +206,10 @@ abstract class AbstractPlayerService : MediaLibraryService(), MediaLibrarySessio
                 updateNotification()
             }
 
+            args.containsKey(PlayerCommand.SET_READER_VIEW.name) -> {
+                isReaderView = args.getBoolean(PlayerCommand.SET_READER_VIEW.name)
+            }
+
             args.containsKey(PlayerCommand.SET_SB_AUTO_SKIP_ENABLED.name) -> {
                 sponsorBlockAutoSkip = args.getBoolean(PlayerCommand.SET_SB_AUTO_SKIP_ENABLED.name)
             }
@@ -339,6 +343,11 @@ abstract class AbstractPlayerService : MediaLibraryService(), MediaLibrarySessio
 
     abstract val isOfflinePlayer: Boolean
     var isAudioOnlyPlayer: Boolean = false
+
+    /**
+     * Whether the transcript is shown for reading: new videos then don't start playing on their own.
+     */
+    var isReaderView: Boolean = false
 
     val watchPositionsEnabled
         get() =

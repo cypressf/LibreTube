@@ -320,6 +320,10 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
             AbstractPlayerService.runPlayerActionCommand,
             bundleOf(PlayerCommand.TOGGLE_AUDIO_ONLY_MODE.name to false)
         )
+        playerController?.sendCustomCommand(
+            AbstractPlayerService.runPlayerActionCommand,
+            bundleOf(PlayerCommand.SET_READER_VIEW.name to false)
+        )
 
         killFragment(false)
 
@@ -532,7 +536,19 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
         updateKeepScreenOn()
 
         // reader view is for reading, not listening
+        sendReaderViewToService()
         if (isReaderView) playerController?.pause()
+    }
+
+    /**
+     * Tell the player service whether reader view is open, so that it doesn't start playing new
+     * videos on its own while the user reads.
+     */
+    private fun sendReaderViewToService() {
+        playerController?.sendCustomCommand(
+            AbstractPlayerService.runPlayerActionCommand,
+            bundleOf(PlayerCommand.SET_READER_VIEW.name to isReaderView)
+        )
     }
 
     private fun minimize() {
@@ -579,6 +595,7 @@ class AudioPlayerFragment : Fragment(R.layout.fragment_audio_player), AudioPlaye
         requireArguments().putBoolean(IntentData.readerView, enabled)
         requireArguments().putBoolean(IntentData.readerViewIsDefault, isReaderViewDefault)
 
+        sendReaderViewToService()
         if (enabled) {
             // reader view is for reading, not listening; the audio can still be started from the
             // player controls or the notification

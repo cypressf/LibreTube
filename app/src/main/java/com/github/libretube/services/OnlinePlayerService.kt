@@ -110,7 +110,7 @@ open class OnlinePlayerService : AbstractPlayerService() {
             return
         }
         isAudioOnlyPlayer = args.getBoolean(IntentData.audioOnly)
-        val startPaused = args.getBoolean(IntentData.startPaused, false)
+        isReaderView = args.getBoolean(IntentData.readerView, false)
 
         // get the intent arguments
         videoId = playerData.videoId!!
@@ -192,9 +192,9 @@ open class OnlinePlayerService : AbstractPlayerService() {
         }
 
         exoPlayer?.apply {
-            // automatically start playback when using the audio player, unless it's only opened
-            // for reading the transcript
-            playWhenReady = !startPaused && (PlayerHelper.playAutomatically || isAudioOnlyPlayer)
+            // automatically start playback when using the audio player, unless the transcript is
+            // shown for reading
+            playWhenReady = !isReaderView && (PlayerHelper.playAutomatically || isAudioOnlyPlayer)
             prepare()
         }
     }
